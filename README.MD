@@ -354,3 +354,231 @@ Following the same format used in the SQL practice files — every fix is tied b
 `Power Query` · `Power Pivot (Data Model)` · `DAX` · `PivotTables / PivotCharts` · `Slicers` · Excel 2016+
 
 ---
+# Bank Debit and Credit Dashboard: Power Query, SUMIFS Engine & Pivot Engine
+
+Second dashboard in the series. Unlike the first Banking Dashboard (built on Power Pivot + DAX), this one is built on a lighter-weight stack: Power Query for cleaning, plain `SUMIFS`/`COUNTIF` formulas for headline KPIs, and a separate hidden "Pivot Engine" sheet for categorical breakdowns and charts. It also introduces a statistically-driven fraud/anomaly KPI using `PERCENTILE.INC`.
+
+---
+
+## 1. Project Summary
+
+| | |
+|---|---|
+| **Source file** | `Debit and Credit banking_data.xlsx - Sheet1.csv` |
+| **Cleaned query name** | `BankData` |
+| **Total transactions** | 10,000 |
+| **Sheets** | Dashboard (front-end), Pivot Engine (hidden, back-end) |
+| **KPI count** | 12 |
+| **Architecture** | Data Model / Power Pivot only for 4 KPIs |
+| **Dashboard surface** | KPI cards, suspicious-activity banner, branch bar chart, transaction method donut, time-series line chart, bank volume bar chart, branch growth multi-line chart, Branch slicer |
+
+---
+
+## 2. Why This Structure (Design Rationale)
+
+
+
+- **Structured table references (`BankData[Amount]`, `BankData[Transaction Type]`) instead of cell ranges.** This is the reason the query was renamed from the messy source filename to `BankData` immediately after import — clean table names are what make formulas like `=SUMIFS(BankData[Amount], BankData[Transaction Type], "Credit")` readable and resilient to row insertions.
+- **A hidden "Pivot Engine" sheet separates calculation from presentation.** The 5 categorical KPIs (branch, bank, method, time trend, growth) are built as PivotTables on their own back-end sheet, then the resulting PivotCharts are cut and pasted onto the Dashboard sheet. This keeps the front-end visually clean while the underlying PivotTables stay editable on their own tab.
+- **The 95th-percentile risk threshold is calculated once, then referenced everywhere.** Rather than hardcoding a dollar threshold for "suspicious," the threshold lives in one cell (`Dashboard!$J$2`) and every transaction is flagged against it with a single `IF` formula. This makes the entire risk model self-adjusting as the dataset changes — see §5.
+
+---
+
+## 3. Phase 1 — Import & Cleaning (Power Query)
+
+| Step | Action |
+|---|---|
+| 1 | Get Data → From File → From Text/CSV → select `Debit and Credit banking_data.xlsx - Sheet1.csv` |
+| 2 | Click **Transform Data** (not Load) to open Power Query Editor |
+| 3 | Set `Amount` column → Decimal Number / Currency |
+| 4 | Set `Transaction Type` column → Text |
+| 5 | Set `Transaction Date` column → Date |
+| 6 | Rename the query from the long source filename to **`BankData`** |
+| 7 | Close & Load → dumps the cleaned data into a new sheet as a structured (green) Excel Table |
+
+**Why renaming the query matters:** every downstream formula in this dashboard references `BankData[ColumnName]`. Skipping the rename means every formula has to reference an unreadable auto-generated query name instead.
+
+---
+
+## 4. Phase 2 — Headline KPI Formulas (Dashboard Sheet)
+
+All four formulas below are placed directly on the **Dashboard** sheet and reference the `BankData` table — no PivotTable required.
+
+| KPI | Cell | Formula | Format |
+|---|---|---|---|
+| **1. Total Credit Amount** | B2 | `=SUMIFS(BankData[Amount], BankData[Transaction Type], "Credit")` | `₹ #,##0.0,,"M"` |
+| **2. Total Debit Amount** | B3 | `=SUMIFS(BankData[Amount], BankData[Transaction Type], "Debit")` | `₹ #,##0.0,,"M"` |
+| **3. Credit to Debit Ratio** | — | `=B2 / B3` | `0.00x` |
+| **4. Net Transaction Amount** | — | `=B2 - B3` | `₹ #,##0.0,"K"` |
+
+> **Note on Net Transaction Amount:** if debits exceed credits, this naturally returns negative — that's correct behavior, representing net negative cash flow for the period, not an error to fix.
+
+---
+
+## 5. The 95th Percentile High-Risk Threshold (KPI 11 + 12)
+
+### 5.1 Business Purpose
+
+In banking, transactions need a way to be flagged "High-Risk" for manual review, a real-world requirement for anti-money-laundering and fraud detection workflows. A hardcoded dollar threshold (e.g. "anything over ₹5,000 is suspicious") breaks in two ways:
+
+- **False positives** — a threshold tuned for a retail branch will flag thousands of normal transactions at a corporate branch where ₹5,000 is routine.
+- **False negatives** — as the bank grows or inflation shifts typical transaction size, a fixed threshold goes stale and stops catching real outliers.
+
+The fix is to let the data define "normal" instead of guessing a number: the 95th percentile asks the dataset "what is the cutoff above which only the top 5% most extreme transactions sit?" ; and recalculates automatically as the data changes.
+
+### 5.2 The Formula
+
+```excel
+J1: High Risk Threshold (95th Percentile)
+J2: =PERCENTILE.INC(BankData[Amount], 0.95)
+```
+
+**What Excel does under the hood:**
+1. **Sort** — every transaction amount in `BankData` (all 10,000 rows) is sorted from smallest to largest.
+2. **Cutoff** — the sorted list is split into the bottom 95% (normal, everyday transactions) and the top 5% (extreme outliers).
+3. **Value** — Excel returns the exact amount sitting on the border between those two groups. That amount becomes the live threshold in `J2`.
+
+### 5.3 Applying the Flag (Step 1)
+
+Back on the `BankData` table, a new column is added directly to the right of the last existing column:
+
+```excel
+Header: High Risk Flag
+Formula: =IF([@Amount] > Dashboard!$J$2, "High Risk", "Normal")
+```
+
+This auto-fills down the entire structured table and tags only the top 5% of transactions — every row references the single live threshold cell, so the flag updates automatically if the underlying data changes.
+
+### 5.4 Pulling the Flag onto the Dashboard (Step 2)
+
+| KPI | Cell | Formula | Insight |
+|---|---|---|---|
+| **12. Suspicious Transaction Frequency** | B5 | `=COUNTIF(BankData[High Risk Flag], "High Risk")` | Exact count of anomalies to investigate |
+| **5. Account Activity Ratio** | B6 | `=COUNTA(BankData[Account Number]) / AVERAGE(BankData[Balance])` | Dividing total transactions by *average* portfolio balance (not summed balance) gives a mathematically accurate activity-to-liquidity ratio |
+
+### 5.5 Why This Is the Right Approach
+
+The dashboard is "living" software: if the bank lands a major client whose transactions run far larger than the current average, the 95th-percentile threshold rises automatically to match — a hardcoded ₹5,000 rule would have broken the moment that client showed up. It is a self-adjusting, mathematically sound risk model, which is exactly why this formula resulted in flagging **5,000 transactions out of 10,000 total** — precisely the top 5%, as designed.
+
+---
+
+## 6. Phase 3 — The Pivot Engine (KPIs 6–10)
+
+The 5 remaining categorical KPIs are built as PivotTables on a dedicated, hidden **Pivot Engine** sheet — kept separate from the Dashboard to avoid cluttering the front-end with calculation tables.
+
+| KPI | Rows | Values | Notes |
+|---|---|---|---|
+| **7. Total Transaction Amount by Branch** | Branch | Sum of Amount | Formatted as Currency |
+| **8. Transaction Volume by Bank** | Bank Name | Sum of Amount | Copied from KPI 7 PivotTable, Rows swapped |
+| **9. Transaction Method Distribution** | Transaction Method | Count of Account Number | Right-click → Show Values As → % of Grand Total |
+| **6. Transactions per Day/Week/Month** | Transaction Date | Count of Account Number | Right-click any date → Group → Months and Days |
+| **10. Branch Transaction Growth %** | Rows: Transaction Date (grouped to Months) · Columns: Branch · Values: Sum of Amount | Show Values As → % Difference From → Base Field: Transaction Date (Months), Base Item: (Previous) |
+
+### 6.1 KPI 10 Build Notes (Rebuilt From Scratch)
+
+KPI 10 required a full rebuild after the initial attempt broke:
+
+1. Deleted the broken PivotTable entirely, leaving at least 15 blank rows × 10 blank columns of clear space.
+2. Copied a working PivotTable (KPI 9) into the cleared space as a fresh starting point.
+3. Cleared all fields from the new PivotTable's field wells.
+4. Re-added fields in this exact order: **Rows** → Transaction Date (grouped to Months, so time sits on the X-axis) · **Columns** → Branch (so each branch renders as its own line) · **Values** → Amount (defaults to Sum of Amount).
+5. Converted raw dollar values to growth percentages via Show Values As → % Difference From → Previous Month.
+
+### 6.2 Data Quality Note — December 2024 Exclusion
+
+KPI 6's pivot table revealed that only **December 1st** had any recorded transactions for December (305 transactions, no other December dates present) — a partial-month data artifact, not a real trend. The fix: in the PivotTable date filter, December was unchecked using `"<01-01-2024"` and `">02-12-2024"` as bounds, and the following note was added directly to the chart:
+
+> *"Note: December 2024 excluded from trend analysis due to partial month data (Dec 1 only ; 300 records)."*
+
+This note is visible on the live dashboard (Transactions Over Time panel), a clear example of flagging a data limitation directly on the visual rather than letting it silently distort the trend line.
+
+---
+
+## 7. Phase 4 — Visualization (Pivot Engine → Dashboard)
+
+| KPI | Chart Type | Build Method |
+|---|---|---|
+| KPI 7 (Branch Amount) | Bar Chart | PivotTable Analyze → PivotChart → Bar → cut → paste onto Dashboard |
+| KPI 8 (Bank Volume) | Bar/Column Chart | Same cut-and-paste method |
+| KPI 9 (Transaction Method) | Pie/Donut Chart | Same cut-and-paste method |
+| KPI 6 (Transactions Over Time) | Line Chart | Same cut-and-paste method; December note added |
+| KPI 10 (Branch Growth %) | Line Chart | Same cut-and-paste method; multi-line, one per branch |
+
+All PivotCharts are built on the Pivot Engine sheet, then cut (`Ctrl+X`) and pasted (`Ctrl+V`) onto the Dashboard sheet — keeping the calculation layer and the presentation layer on separate tabs while the charts themselves remain live and refreshable.
+
+---
+
+## 8. Formatting Reference
+
+| Field | Format String |
+|---|---|
+| Total Credit Amount / Total Debit Amount | `₹ #,##0.0,,"M"` |
+| Net Transaction Amount | `₹ #,##0.0,"K"` |
+| Credit to Debit Ratio | `0.00x` |
+| Suspicious Transaction Frequency | Whole Number |
+| Account Activity Ratio | Number / `0.0x` |
+
+---
+
+## 9. Dashboard Layout (As Built)
+
+| Element | Source |
+|---|---|
+| Total Transactions banner | Count of all rows in BankData |
+| KPI card row 1 | Total Credit Amount, Total Debit Amount, Net Transaction Amount, Credit to Debit Ratio, Total Debit Transactions, Total Credit Transactions, Total Bank Transfer Transactions |
+| Risk banner | Suspicious Transaction Frequency (KPI 12), Account Activity Ratio (KPI 5) |
+| Total Transaction Amount by Branch | KPI 7 — horizontal bar |
+| Transaction Method Distribution | KPI 9 — donut |
+| Transactions Over Time | KPI 6 — line, with December exclusion note |
+| Transaction Volume by Bank | KPI 8 — vertical bar |
+| Branch Transaction Growth | KPI 10 — multi-line, % difference from previous month |
+| Branch slicer | Connected across relevant PivotTables/charts |
+
+### Result (as built)
+
+| KPI | Value |
+|---|---|
+| Total Transactions | 10,000 |
+| Total Credit Amount | ₹127.6 M |
+| Total Debit Amount | ₹127.3 M |
+| Net Transaction Amount | ₹318.1 K |
+| Credit to Debit Ratio | 1.00x |
+| Total Debit Transactions | 33,352 |
+| Total Credit Transactions | 33,310 |
+| Total Bank Transfer Transactions | 33,338 |
+| Suspicious Transaction Frequency | 5,000 |
+| Account Activity Ratio | 19.0x |
+
+Branch ranking by transaction amount: City Center (₹42,911K), Main (₹42,839K), East (₹42,697K), Downtown (₹42,587K), Suburban (₹42,176K), North (₹41,677K) — a notably tight spread across all six branches. Transaction method split is near-even across Bank Transfer (33.35%), Credit Card (33.34%), and Debit Card (33.31%). Transaction volume by bank ranges from ₹43,034K (Kotak Mahindra) down to ₹41,666K (HDFC).
+
+---
+
+## 10. Error Log (Rule-Linked)
+
+| Symptom | Root Cause | Rule It Violates | Fix |
+|---|---|---|---|
+| Formulas reference an unreadable query name | Query not renamed after import | Power Query keeps the raw source filename until explicitly renamed — formulas inherit whatever the query is called at the time they're written | Rename query to `BankData` immediately after Transform Data, before writing any formula |
+| KPI 10 pivot table broken/unusable | Fields added in the wrong order or left over from a copied table | A growth-over-time-by-category pivot only resolves correctly with Rows = time, Columns = category, Values = metric, in that specific order — leftover fields from a copy-paste corrupt the layout | Delete the broken table entirely, copy a clean working PivotTable into blank space, clear all fields, re-add in the correct Rows → Columns → Values order |
+| December trend line looks artificially low/spiky | Only Dec 1 has transaction records for the month | A single day of data graphed alongside full months will always read as an anomaly, not a real trend — this is a data-coverage gap, not a business signal | Exclude December from the date filter (`<01-01-2024`, `>02-12-2024`), document the exclusion directly on the chart |
+| High Risk Flag returns the same threshold for every row, or doesn't update | Formula references a relative cell instead of an absolute one | Without `$` locking on `Dashboard!$J$2`, the threshold reference shifts as the formula fills down the table, breaking the flag for every row but the first | Use `Dashboard!$J$2` (absolute reference) in the `IF` formula so every row checks against the same fixed threshold cell |
+| Account Activity Ratio looks abnormally large or small | Balance summed instead of averaged | Summing `Balance` across 10,000 transaction rows massively inflates the denominator, since balance is a snapshot value repeated per transaction, not a per-transaction quantity to be totaled | Use `AVERAGE(BankData[Balance])`, not `SUM`, as the denominator |
+
+---
+
+## 11. Build Phases (Reference Index)
+
+1. **Phase 1** — Import via Power Query (Transform Data, not Load), set types, rename query to `BankData`
+2. **Phase 2** — Build first 4 KPIs directly on the Dashboard sheet with `SUMIFS`/cell arithmetic
+3. **Phase 3 (Step 1)** — Calculate the 95th-percentile high-risk threshold and apply the `High Risk Flag` column
+4. **Phase 3 (Step 2)** — Pull Suspicious Transaction Frequency and Account Activity Ratio onto the Dashboard
+5. **Phase 3 (Step 3)** — Build the 5 categorical PivotTables on the hidden Pivot Engine sheet
+6. **Phase 4** — Convert each PivotTable into a PivotChart, cut and paste onto the Dashboard
+
+---
+
+## 12. Tech Stack
+
+`Power Query` · `SUMIFS / COUNTIF / COUNTA / AVERAGE / PERCENTILE.INC` · `PivotTables / PivotCharts` · `Slicers` · Excel 2016+
+
+---
+
