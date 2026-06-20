@@ -356,6 +356,8 @@ Following the same format used in the SQL practice files — every fix is tied b
 ---
 # Bank Debit and Credit Dashboard: Power Query, SUMIFS Engine & Pivot Engine
 
+![Bank Debit Credit Animation](https://github.com/angelvbenit/bank-analytics/raw/main/advanced-excel/bank-debit-credit.gif)
+
 Second dashboard in the series. Unlike the first Banking Dashboard (built on Power Pivot + DAX), this one is built on a lighter-weight stack: Power Query for cleaning, plain `SUMIFS`/`COUNTIF` formulas for headline KPIs, and a separate hidden "Pivot Engine" sheet for categorical breakdowns and charts. It also introduces a statistically-driven fraud/anomaly KPI using `PERCENTILE.INC`.
 
 ---
