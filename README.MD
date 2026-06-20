@@ -1,6 +1,8 @@
 # ADVANCED EXCEL
 # Banking Dashboard: Power Query, Data Model & DAX KPIs
 
+![Banking Analytics Animation](https://github.com/angelvbenit/bank-analytics/raw/main/advanced-excel/banking.gif)
+
 First dashboard in the series. Built end-to-end from a raw 6-sheet banking dataset to a fully interactive, slicer-driven KPI dashboard backed by a star-schema data model and 23 live DAX measures.
 
 ---
