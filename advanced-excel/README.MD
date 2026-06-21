@@ -586,5 +586,5 @@ Branch ranking by transaction amount: City Center (₹42,911K), Main (₹42,839K
 
 ---
 
-# SQL
+
 
