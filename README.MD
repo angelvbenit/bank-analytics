@@ -1,22 +1,22 @@
 ## Repository Structure
 
 ```text
-Banking-Analytics-Portfolio/
+bank-analytics/
 │
 ├── README.md  ← Executive summary, tool comparision, insights, key findings & solutions
 │
-├── Advanced Excel/
+├── advanced-excel/
 │   ├── Dashboard files
 │   └── README.md
 │
-├── SQL/
+├── sql/
 │   ├── Scripts
 │   └── README.md
 │
-├── Power BI/
+├── power-bi/
 │   ├── PBIX
 │   └── README.md
 │
-└── Tableau/
+└── tableau/
     ├── Workbook
     └── README.md
