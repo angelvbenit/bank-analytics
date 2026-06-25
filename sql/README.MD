@@ -1,4 +1,4 @@
-# 🏦 Bank Transaction Analytics: SQL Project
+# Bank Transaction Analytics: SQL Project
 
 A end-to-end SQL analytics project that ingests bank transaction data, stores it in a relational database, and computes 12 business KPIs covering transaction volumes, branch performance, risk detection, and growth trends.
 
