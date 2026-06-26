@@ -18,11 +18,7 @@ CREATE TABLE debitcredit (
     bank_name          TEXT
 );
 
-SET GLOBAL local_infile = 1;
-
-USE bank_db;
-
-LOAD DATA LOCAL INFILE 'D:/excelr/PROJECT 2/by me/debitcredit.csv'
+LOAD DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/debitcredit.csv'
 INTO TABLE debitcredit
 FIELDS TERMINATED BY ','
 ENCLOSED BY '"'
@@ -31,107 +27,120 @@ IGNORE 1 ROWS;
 
 SELECT COUNT(*) FROM debitcredit;
 
-### KPI 1: TOTAL CREDIT ###
-SELECT SUM(amount) AS total_credit
-FROM debitcredit
-WHERE transaction_type = 'Credit';
+USE bank_db;
 
-### KPI 2: TOTAL DEBIT ###
-SELECT SUM(amount) AS total_debit
-FROM debitcredit
-WHERE transaction_type = 'Debit';
+-- KPI 1: TOTAL CREDIT
+DROP TABLE IF EXISTS kpi1_total_credit;
+CREATE TABLE kpi1_total_credit (total_credit DECIMAL(18,4));
+INSERT INTO kpi1_total_credit
+SELECT SUM(amount) FROM debitcredit WHERE transaction_type = 'Credit';
+SELECT * FROM kpi1_total_credit;
 
-### KPI 3: CREDIT TO DEBIT RATIO ###
+-- KPI 2: TOTAL DEBIT
+DROP TABLE IF EXISTS kpi2_total_debit;
+CREATE TABLE kpi2_total_debit (total_debit DECIMAL(18,4));
+INSERT INTO kpi2_total_debit
+SELECT SUM(amount) FROM debitcredit WHERE transaction_type = 'Debit';
+SELECT * FROM kpi2_total_debit;
+
+
+-- KPI 3: CREDIT TO DEBIT RATIO
+DROP TABLE IF EXISTS kpi3_credit_debit_ratio;
+CREATE TABLE kpi3_credit_debit_ratio (credit_to_debit_ratio DECIMAL(10,4));
+INSERT INTO kpi3_credit_debit_ratio
 SELECT ROUND(
     SUM(CASE WHEN transaction_type = 'Credit' THEN amount ELSE 0 END) /
     NULLIF(SUM(CASE WHEN transaction_type = 'Debit' THEN amount ELSE 0 END), 0),
-4) AS credit_to_debit_ratio
-FROM debitcredit;
+4) FROM debitcredit;
+SELECT * FROM kpi3_credit_debit_ratio;
 
-### KPI 4: NET TRANSACTION AMOUNT ###
+-- KPI 4: NET TRANSACTION AMOUNT
+DROP TABLE IF EXISTS kpi4_net_transaction_amount;
+CREATE TABLE kpi4_net_transaction_amount (net_transaction_amount DECIMAL(18,4));
+INSERT INTO kpi4_net_transaction_amount
 SELECT SUM(CASE WHEN transaction_type = 'Credit' THEN amount
                WHEN transaction_type = 'Debit'  THEN -amount
-               ELSE 0 END) AS net_transaction_amount
-FROM debitcredit;
+               ELSE 0 END) FROM debitcredit;
+SELECT * FROM kpi4_net_transaction_amount;
 
-### KPI 5: ACCOUNT ACTIVITY RATIO ###
-SELECT 
-    COUNT(*) / NULLIF(AVG(balance), 0) AS Overall_Account_Activity_Ratio
-FROM debitcredit;
+-- KPI 5: ACCOUNT ACTIVITY RATIO
+DROP TABLE IF EXISTS kpi5_account_activity_ratio;
+CREATE TABLE kpi5_account_activity_ratio (overall_account_activity_ratio DECIMAL(18,6));
+INSERT INTO kpi5_account_activity_ratio
+SELECT COUNT(*) / NULLIF(AVG(balance), 0) FROM debitcredit;
+SELECT * FROM kpi5_account_activity_ratio;
 
+-- KPI 6a: TRANSACTIONS PER DAY
+DROP TABLE IF EXISTS kpi6a_txn_per_day;
+CREATE TABLE kpi6a_txn_per_day (txn_day DATE, total_transactions INT);
+INSERT INTO kpi6a_txn_per_day
+SELECT DATE(DATE_ADD('1899-12-30', INTERVAL transaction_date DAY)), COUNT(*)
+FROM debitcredit GROUP BY 1 ORDER BY 1;
+SELECT * FROM kpi6a_txn_per_day;
 
-### kpi 6: transactions per day week and month ###
--- Per Day
-SELECT 
-    DATE(DATE_ADD('1899-12-30', INTERVAL transaction_date DAY)) AS Txn_Day, 
-    COUNT(*) AS Total_Transactions
-FROM debitcredit
-GROUP BY Txn_Day
-ORDER BY Txn_Day;
+-- KPI 6b: TRANSACTIONS PER WEEK
+DROP TABLE IF EXISTS kpi6b_txn_per_week;
+CREATE TABLE kpi6b_txn_per_week (txn_week VARCHAR(20), total_transactions INT);
+INSERT INTO kpi6b_txn_per_week
+SELECT DATE_FORMAT(DATE_ADD('1899-12-30', INTERVAL transaction_date DAY), '%Y - Week %u'), COUNT(*)
+FROM debitcredit GROUP BY 1 ORDER BY 1;
+SELECT * FROM kpi6b_txn_per_week;
 
--- Per Week
-SELECT 
-    DATE_FORMAT(DATE_ADD('1899-12-30', INTERVAL transaction_date DAY), '%Y - Week %u') AS Txn_Week, 
-    COUNT(*) AS Total_Transactions
-FROM debitcredit
-GROUP BY Txn_Week
-ORDER BY Txn_Week;
+-- KPI 6c: TRANSACTIONS PER MONTH
+DROP TABLE IF EXISTS kpi6c_txn_per_month;
+CREATE TABLE kpi6c_txn_per_month (txn_month VARCHAR(10), total_transactions INT);
+INSERT INTO kpi6c_txn_per_month
+SELECT DATE_FORMAT(DATE_ADD('1899-12-30', INTERVAL transaction_date DAY), '%Y-%m'), COUNT(*)
+FROM debitcredit GROUP BY 1 ORDER BY 1;
+SELECT * FROM kpi6c_txn_per_month;
 
--- Per Month
-SELECT 
-    DATE_FORMAT(DATE_ADD('1899-12-30', INTERVAL transaction_date DAY), '%Y-%m') AS Txn_Month, 
-    COUNT(*) AS Total_Transactions
-FROM debitcredit
-GROUP BY Txn_Month
-ORDER BY Txn_Month;
+-- KPI 7: TOTAL TRANSACTION AMOUNT BY BRANCH
+DROP TABLE IF EXISTS kpi7_amount_by_branch;
+CREATE TABLE kpi7_amount_by_branch (branch VARCHAR(100), total_amount DECIMAL(18,4));
+INSERT INTO kpi7_amount_by_branch
+SELECT branch, SUM(amount) FROM debitcredit GROUP BY branch ORDER BY 2 DESC;
+SELECT * FROM kpi7_amount_by_branch;
 
-### KPI 7: Total transactions amount by branch ###
-SELECT branch, SUM(amount) AS Total_Amount
-FROM debitcredit
-GROUP BY branch
-ORDER BY Total_Amount DESC;
+-- KPI 8: TRANSACTION VOLUME BY BANK
+DROP TABLE IF EXISTS kpi8_volume_by_bank;
+CREATE TABLE kpi8_volume_by_bank (bank_name VARCHAR(100), total_volume DECIMAL(18,4));
+INSERT INTO kpi8_volume_by_bank
+SELECT bank_name, SUM(amount) FROM debitcredit GROUP BY bank_name ORDER BY 2 DESC;
+SELECT * FROM kpi8_volume_by_bank;
 
-### KPI 8: Transaction volume by branch ###
-SELECT bank_name, SUM(amount) AS Total_Volume
-FROM debitcredit
-GROUP BY bank_name
-ORDER BY Total_Volume DESC;
+-- KPI 9: TRANSACTION METHOD DISTRIBUTION
+DROP TABLE IF EXISTS kpi9_method_distribution;
+CREATE TABLE kpi9_method_distribution (transaction_method VARCHAR(100), transaction_count INT, percentage_distribution DECIMAL(6,2));
+INSERT INTO kpi9_method_distribution
+SELECT transaction_method, COUNT(*),
+    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM debitcredit), 2)
+FROM debitcredit GROUP BY transaction_method ORDER BY 2 DESC;
+SELECT * FROM kpi9_method_distribution;
 
-### KPI 9: Transaction Method Distribution ###
-SELECT 
-    transaction_method, 
-    COUNT(*) AS Transaction_Count,
-    ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM debitcredit), 2) AS Percentage_Distribution
-FROM debitcredit
-GROUP BY transaction_method
-ORDER BY Transaction_Count DESC;
-
-### kpi 10: branch transaction growth ###
+-- KPI 10: BRANCH TRANSACTION GROWTH
+DROP TABLE IF EXISTS kpi10_branch_mom_growth;
+CREATE TABLE kpi10_branch_mom_growth (branch VARCHAR(100), txn_month VARCHAR(10), monthly_volume DECIMAL(18,4), prev_month_volume DECIMAL(18,4), mom_growth_pct DECIMAL(10,2));
+INSERT INTO kpi10_branch_mom_growth
 WITH MonthlyBranchVolume AS (
-    SELECT 
-        branch,
+    SELECT branch,
         DATE_FORMAT(DATE_ADD('1899-12-30', INTERVAL transaction_date DAY), '%Y-%m') AS Txn_Month,
         SUM(amount) AS Monthly_Volume
-    FROM debitcredit
-    GROUP BY branch, Txn_Month
+    FROM debitcredit GROUP BY branch, Txn_Month
 )
-SELECT 
-    branch,
-    Txn_Month,
-    Monthly_Volume,
-    LAG(Monthly_Volume) OVER(PARTITION BY branch ORDER BY Txn_Month) AS Prev_Month_Volume,
-    
-    -- Calculates the % growth. NULLIF prevents division by zero errors.
+SELECT branch, Txn_Month, Monthly_Volume,
+    LAG(Monthly_Volume) OVER(PARTITION BY branch ORDER BY Txn_Month),
     ROUND(
-        ((Monthly_Volume - LAG(Monthly_Volume) OVER(PARTITION BY branch ORDER BY Txn_Month)) / 
+        ((Monthly_Volume - LAG(Monthly_Volume) OVER(PARTITION BY branch ORDER BY Txn_Month)) /
         NULLIF(LAG(Monthly_Volume) OVER(PARTITION BY branch ORDER BY Txn_Month), 0)) * 100, 2
-    ) AS MoM_Growth_Percentage
-    
+    )
 FROM MonthlyBranchVolume;
+SELECT * FROM kpi10_branch_mom_growth;
 
-### KPI 11: High risk transaction flag ###
+-- KPI 11: HIGH RISK TRANSACTION FLAG
+DROP TABLE IF EXISTS kpi11_high_risk_transactions;
+CREATE TABLE kpi11_high_risk_transactions (customer_id TEXT, account_number TEXT, readable_date DATE, amount TEXT, risk_flag VARCHAR(20), threshold_used TEXT);
+INSERT INTO kpi11_high_risk_transactions
 WITH DynamicThreshold AS (
-    -- Finds the exact cutoff amount for the top 5%
     SELECT amount AS high_risk_cutoff
     FROM (
         SELECT amount, PERCENT_RANK() OVER (ORDER BY amount) AS pct_rank
@@ -141,20 +150,18 @@ WITH DynamicThreshold AS (
     ORDER BY amount ASC
     LIMIT 1
 )
-SELECT 
-    d.customer_id, 
-    d.account_number, 
-    DATE(DATE_ADD('1899-12-30', INTERVAL d.transaction_date DAY)) AS Readable_Date, 
-    d.amount,
-    'High Risk' AS Risk_Flag,
-    t.high_risk_cutoff AS Threshold_Used
-FROM debitcredit d
-CROSS JOIN DynamicThreshold t
+SELECT d.customer_id, d.account_number,
+    DATE(DATE_ADD('1899-12-30', INTERVAL d.transaction_date DAY)),
+    d.amount, 'High Risk', t.high_risk_cutoff
+FROM debitcredit d CROSS JOIN DynamicThreshold t
 WHERE d.amount > t.high_risk_cutoff;
+SELECT * FROM kpi11_high_risk_transactions;
 
-## KPI 12: Suspicious transaction frequency ###
+-- KPI 12: SUSPICIOUS TRANSACTION COUNT
+DROP TABLE IF EXISTS kpi12_suspicious_txn_count;
+CREATE TABLE kpi12_suspicious_txn_count (total_suspicious_transactions INT);
+INSERT INTO kpi12_suspicious_txn_count
 WITH DynamicThreshold AS (
-    -- Finds the exact cutoff amount for the top 5%
     SELECT amount AS high_risk_cutoff
     FROM (
         SELECT amount, PERCENT_RANK() OVER (ORDER BY amount) AS pct_rank
@@ -164,8 +171,8 @@ WITH DynamicThreshold AS (
     ORDER BY amount ASC
     LIMIT 1
 )
-SELECT 
-    COUNT(*) AS Total_Suspicious_Transactions
-FROM debitcredit d
+SELECT COUNT(*) FROM debitcredit d
 CROSS JOIN DynamicThreshold t
 WHERE d.amount > t.high_risk_cutoff;
+
+SELECT * FROM kpi12_suspicious_txn_count;
