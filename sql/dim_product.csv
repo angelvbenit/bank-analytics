@@ -1,0 +1,12 @@
+Product Id,Product Code,Purpose Category,Term,Int Rate,Grade,Sub Grade
+JLG30K,XLG,Services, 36 months,0.1065,B,B2
+JLG45K,XLG,Agriculture, 36 months,0.0751,A,A3
+JLG46K,XLG,Education, 36 months,0.1825,D,D5
+JLG44K,XLG,Home Loan, 36 months,0.0662,A,A2
+JLG35K,XLG,Trade, 36 months,0.0991,B,B1
+JLG50K,XLG,Home Loan, 60 months,0.1991,E,E4
+JLG29K,XLG,Property, 60 months,0.1727,D,D3
+JLG35,XLG,Car Loan, 60 months,0.1465,C,C3
+JLG41K,XLG,Services, 36 months,0.1465,C,C3
+JLG40K,XLG,Services, 36 months,0.1727,D,D3
+JLG39K,XLG,Fectory , 36 months,0.0662,A,A2
