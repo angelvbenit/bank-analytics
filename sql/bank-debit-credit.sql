@@ -176,3 +176,10 @@ CROSS JOIN DynamicThreshold t
 WHERE d.amount > t.high_risk_cutoff;
 
 SELECT * FROM kpi12_suspicious_txn_count;
+
+-- KPI 13: TOTAL TRANSACTIONS
+DROP TABLE IF EXISTS kpi13_total_transactions;
+CREATE TABLE kpi13_total_transactions (total_transactions INT);
+INSERT INTO kpi13_total_transactions
+SELECT COUNT(*) FROM debitcredit;
+ select * from kpi13_total_transactions;

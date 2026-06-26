@@ -1,6 +1,6 @@
 # Bank Transaction Analytics: SQL Project
 
-A end-to-end SQL analytics project that ingests bank transaction data, stores it in a relational database, and computes 12 business KPIs covering transaction volumes, branch performance, risk detection, and growth trends.
+A end-to-end SQL analytics project that ingests bank transaction data, stores it in a relational database, and computes 13 business KPIs covering transaction volumes, branch performance, risk detection, and growth trends.
 
 ---
 
@@ -8,7 +8,7 @@ A end-to-end SQL analytics project that ingests bank transaction data, stores it
 
 **Database:** `bank_db`  
 **Table:** `debitcredit`  
-**Engine:** MySQL (uses `LOAD DATA LOCAL INFILE`, `DATE_FORMAT`, `PERCENT_RANK`, window functions)
+**Engine:** MySQL (uses `LOAD DATA INFILE`, `DATE_FORMAT`, `PERCENT_RANK`, window functions)
 
 ### Table Schema
 
@@ -35,35 +35,29 @@ A end-to-end SQL analytics project that ingests bank transaction data, stores it
 
 | Property              | Detail                                                              |
 |-----------------------|---------------------------------------------------------------------|
-| Total Records         | ~1,0000 transactions                                                 |
+| Total Records         | ~100,000 transactions                                               |
 | Currency              | INR (Indian Rupee)                                                  |
 | Banks Covered         | Axis Bank, HDFC Bank, ICICI Bank, Kotak Mahindra Bank, State Bank of India, Punjab National Bank |
 | Branches              | Main Branch, City Center Branch, North Branch, East Branch, Suburban Branch, Downtown Branch |
 | Transaction Types     | Credit, Debit                                                       |
 | Payment Methods       | Credit Card, Debit Card, Bank Transfer                              |
-| Transaction Categories | Salary Deposit, Bonus Payment, Client Payment, Freelance Payment, Online Shopping, Grocery Shopping, Utility Bill Payment, Refund from Retailer, Refund for Overcharge, Dinner at Restaurant, Dinner at Restaurant |
+| Transaction Categories | Salary Deposit, Bonus Payment, Client Payment, Freelance Payment, Online Shopping, Grocery Shopping, Utility Bill Payment, Refund from Retailer, Refund for Overcharge, Dinner at Restaurant |
 
 ---
 
 ## Setup Instructions
 
 ### 1. Prerequisites
-- MySQL Server 8.0+ 
-- MySQL client or Workbench
+- MySQL Server 8.0+
+- MySQL Workbench or any MySQL client
 
-### 2. Enable Local File Loading
-
-```sql
-SET GLOBAL local_infile = 1;
-```
-
-> Run this as a MySQL superuser before executing the load script.
-
-### 3. Create Database and Table
+### 2. Create Database and Table
 
 ```sql
-CREATE DATABASE bank_db;
+CREATE DATABASE IF NOT EXISTS bank_db;
 USE bank_db;
+
+DROP TABLE IF EXISTS debitcredit;
 
 CREATE TABLE debitcredit (
     customer_id        TEXT,
@@ -81,12 +75,12 @@ CREATE TABLE debitcredit (
 );
 ```
 
-### 4. Load Data
+### 3. Load Data
 
-Update the file path in the script to match your local machine before running:
+Copy your CSV into MySQL's secure upload folder, then run:
 
 ```sql
-LOAD DATA LOCAL INFILE 'D:/your_path/debitcredit.csv'
+LOAD DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/debitcredit.csv'
 INTO TABLE debitcredit
 FIELDS TERMINATED BY ','
 ENCLOSED BY '"'
@@ -94,11 +88,13 @@ LINES TERMINATED BY '\n'
 IGNORE 1 ROWS;
 ```
 
-### 5. Verify Load
+> **Note:** `secure_file_priv` must point to the folder containing the CSV. Run `SHOW VARIABLES LIKE 'secure_file_priv';` to find your path.
+
+### 4. Verify Load
 
 ```sql
 SELECT COUNT(*) FROM debitcredit;
--- Expected: ~10000 rows
+-- Expected: 100000 rows
 ```
 
 ---
@@ -208,7 +204,7 @@ GROUP BY Txn_Month
 ORDER BY Txn_Month;
 ```
 
-**Insight:** Identifies peak and off-peak periods. Useful for staffing, server capacity planning, and targeted marketing campaigns (e.g., promotions during low-activity months).
+**Insight:** Identifies peak and off-peak periods. Useful for staffing, server capacity planning, and targeted marketing campaigns.
 
 > **Date conversion explained:** `DATE_ADD('1899-12-30', INTERVAL transaction_date DAY)` converts Excel's serial date integer back to a human-readable SQL date.
 
@@ -258,7 +254,7 @@ GROUP BY transaction_method
 ORDER BY Transaction_Count DESC;
 ```
 
-**Insight:** Shows customer payment behaviour. If Bank Transfer dominates, it suggests corporate/bulk users. If Debit Card is most common, it indicates retail consumer behaviour. Informs product and infrastructure decisions.
+**Insight:** Shows customer payment behaviour. Informs product and infrastructure decisions.
 
 ---
 
@@ -287,7 +283,7 @@ SELECT
 FROM MonthlyBranchVolume;
 ```
 
-**Insight:** Uses the `LAG()` window function to compare each month against the prior month, partitioned by branch. A negative `MoM_Growth_Percentage` flags a branch that needs investigation. Useful for strategic resource reallocation.
+**Insight:** Uses the `LAG()` window function to compare each month against the prior month per branch. A negative `MoM_Growth_Percentage` flags a branch that needs investigation.
 
 ---
 
@@ -318,7 +314,7 @@ CROSS JOIN DynamicThreshold t
 WHERE d.amount > t.high_risk_cutoff;
 ```
 
-**Insight:** Dynamically identifies the top 5% of transactions by amount using `PERCENT_RANK()`. Unlike a hardcoded threshold, this adapts automatically as the data grows. Each flagged row is tagged `'High Risk'` for easy downstream filtering or reporting.
+**Insight:** Dynamically identifies the top 5% of transactions by amount using `PERCENT_RANK()`. Unlike a hardcoded threshold, this adapts automatically as the data grows.
 
 ---
 
@@ -344,7 +340,20 @@ CROSS JOIN DynamicThreshold t
 WHERE d.amount > t.high_risk_cutoff;
 ```
 
-**Insight:** Provides a single headline count of high-risk transactions. Use this as a dashboard KPI metric alongside KPI 11 for drill-down. By definition, this should be approximately 5% of the total transaction count.
+**Insight:** Provides a single headline count of high-risk transactions. By definition, this should be approximately 5% of total transaction count.
+
+---
+
+### KPI 13: Total Transactions
+
+**Business Question:** How many transactions have been recorded in total?
+
+```sql
+SELECT COUNT(*) AS Total_Transactions
+FROM debitcredit;
+```
+
+**Insight:** The most fundamental metric — the total number of records in the dataset. Used as the baseline denominator for distribution and ratio KPIs (e.g., KPI 9, KPI 12).
 
 ---
 
@@ -360,6 +369,7 @@ WHERE d.amount > t.high_risk_cutoff;
 | `LAG()` window function     | KPI 10 — month-over-month comparison |
 | `CROSS JOIN` with CTE       | KPIs 11, 12 — broadcasting threshold to all rows |
 | Common Table Expressions    | KPIs 10, 11, 12 — readability and reuse |
+| `COUNT(*)`                  | KPI 13 — total record count |
 
 ---
 
@@ -369,27 +379,27 @@ WHERE d.amount > t.high_risk_cutoff;
 All dates in the dataset are stored as Excel serial integers. The formula `DATE_ADD('1899-12-30', INTERVAL transaction_date DAY)` is the correct MySQL equivalent of Excel's date origin.
 
 **Dynamic vs. Static Thresholds (KPIs 11 & 12)**
-The high-risk cutoff uses `PERCENT_RANK()` rather than a hardcoded number. This means the threshold automatically adjusts as new data is added making it production-safe without manual recalibration.
+The high-risk cutoff uses `PERCENT_RANK()` rather than a hardcoded number. This means the threshold automatically adjusts as new data is added — making it production-safe without manual recalibration.
 
 **`NULLIF` Pattern**
-Wherever division occurs (KPIs 3, 5, 10), `NULLIF(denominator, 0)` is used to return `NULL` instead of throwing a division-by-zero error. This is especially important in production where some branches or months may have no prior-month data.
+Wherever division occurs (KPIs 3, 5, 10), `NULLIF(denominator, 0)` is used to return `NULL` instead of throwing a division-by-zero error.
 
+---
 
 ## Summary Table of KPIs
 
-| # | KPI Name                        | Output Type      | Primary Use Case              |
-|---|---------------------------------|------------------|-------------------------------|
-| 1 | Total Credit Amount             | Scalar           | Financial overview            |
-| 2 | Total Debit Amount              | Scalar           | Financial overview            |
-| 3 | Credit to Debit Ratio           | Scalar           | Fund flow health              |
-| 4 | Net Transaction Amount          | Scalar           | Net fund position             |
-| 5 | Account Activity Ratio          | Scalar           | Customer engagement           |
-| 6 | Transactions Per Day/Week/Month | Time series      | Trend & seasonality analysis  |
-| 7 | Total Amount by Branch          | Ranked table     | Branch performance            |
-| 8 | Volume by Bank                  | Ranked table     | Partner bank comparison       |
-| 9 | Payment Method Distribution     | Distribution (%) | Customer behaviour insights   |
-| 10| Branch MoM Growth               | Time series      | Growth tracking & alerts      |
-| 11| High-Risk Transaction Flags     | Flagged records  | Fraud / AML monitoring        |
-| 12| Suspicious Transaction Count    | Scalar           | Risk dashboard headline KPI   |
-
----
+| #  | KPI Name                        | Output Type      | Primary Use Case              |
+|----|---------------------------------|------------------|-------------------------------|
+| 1  | Total Credit Amount             | Scalar           | Financial overview            |
+| 2  | Total Debit Amount              | Scalar           | Financial overview            |
+| 3  | Credit to Debit Ratio           | Scalar           | Fund flow health              |
+| 4  | Net Transaction Amount          | Scalar           | Net fund position             |
+| 5  | Account Activity Ratio          | Scalar           | Customer engagement           |
+| 6  | Transactions Per Day/Week/Month | Time series      | Trend & seasonality analysis  |
+| 7  | Total Amount by Branch          | Ranked table     | Branch performance            |
+| 8  | Volume by Bank                  | Ranked table     | Partner bank comparison       |
+| 9  | Payment Method Distribution     | Distribution (%) | Customer behaviour insights   |
+| 10 | Branch MoM Growth               | Time series      | Growth tracking & alerts      |
+| 11 | High-Risk Transaction Flags     | Flagged records  | Fraud / AML monitoring        |
+| 12 | Suspicious Transaction Count    | Scalar           | Risk dashboard headline KPI   |
+| 13 | Total Transactions              | Scalar           | Baseline record count         |
