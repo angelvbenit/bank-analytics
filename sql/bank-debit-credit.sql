@@ -108,45 +108,83 @@ SELECT DATE_FORMAT(DATE_ADD('1899-12-30', INTERVAL transaction_date DAY), '%Y-%m
 FROM debitcredit GROUP BY 1 ORDER BY 1;
 SELECT * FROM kpi6c_txn_per_month;
 
--- KPI 7: TOTAL TRANSACTION AMOUNT BY BRANCH
+
+-- KPI 7: TOTAL TRANSACTION AMOUNT BY BRANCH (FORMATTED AS MILLIONS STRING)
 DROP TABLE IF EXISTS kpi7_amount_by_branch;
-CREATE TABLE kpi7_amount_by_branch (branch VARCHAR(100), total_amount DECIMAL(18,4));
+-- Changed column type to VARCHAR to store the "m" suffix
+CREATE TABLE kpi7_amount_by_branch (
+    branch VARCHAR(100), 
+    total_amount_formatted VARCHAR(20)
+);
 INSERT INTO kpi7_amount_by_branch
-SELECT branch, SUM(amount) FROM debitcredit GROUP BY branch ORDER BY 2 DESC;
+SELECT 
+    branch, 
+    CONCAT(ROUND(SUM(amount) / 1000000.0, 1), 'm') 
+FROM debitcredit 
+GROUP BY branch 
+ORDER BY SUM(amount) DESC;
 SELECT * FROM kpi7_amount_by_branch;
 
--- KPI 8: TRANSACTION VOLUME BY BANK
+-- KPI 8: TRANSACTION VOLUME BY BANK (FORMATTED AS MILLIONS STRING)
 DROP TABLE IF EXISTS kpi8_volume_by_bank;
-CREATE TABLE kpi8_volume_by_bank (bank_name VARCHAR(100), total_volume DECIMAL(18,4));
+-- Changed column type to VARCHAR to store the "m" suffix
+CREATE TABLE kpi8_volume_by_bank (
+    bank_name VARCHAR(100), 
+    total_volume_formatted VARCHAR(20)
+);
 INSERT INTO kpi8_volume_by_bank
-SELECT bank_name, SUM(amount) FROM debitcredit GROUP BY bank_name ORDER BY 2 DESC;
+SELECT 
+    bank_name, 
+    CONCAT(ROUND(SUM(amount) / 1000000.0, 1), 'm') 
+FROM debitcredit 
+GROUP BY bank_name 
+ORDER BY SUM(amount) DESC;
 SELECT * FROM kpi8_volume_by_bank;
 
--- KPI 9: TRANSACTION METHOD DISTRIBUTION
+-- KPI 9: TRANSACTION METHOD DISTRIBUTION (COUNT AS 'k' STRING)
 DROP TABLE IF EXISTS kpi9_method_distribution;
-CREATE TABLE kpi9_method_distribution (transaction_method VARCHAR(100), transaction_count INT, percentage_distribution DECIMAL(6,2));
+CREATE TABLE kpi9_method_distribution (
+    transaction_method VARCHAR(100), 
+    transaction_count_formatted VARCHAR(20), 
+    percentage_distribution DECIMAL(6,2)
+);
 INSERT INTO kpi9_method_distribution
-SELECT transaction_method, COUNT(*),
+SELECT 
+    transaction_method, 
+    CONCAT(ROUND(COUNT(*) / 1000.0, 1), 'k'),
     ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM debitcredit), 2)
-FROM debitcredit GROUP BY transaction_method ORDER BY 2 DESC;
+FROM debitcredit 
+GROUP BY transaction_method 
+ORDER BY COUNT(*) DESC;
 SELECT * FROM kpi9_method_distribution;
 
--- KPI 10: BRANCH TRANSACTION GROWTH
+-- KPI 10: BRANCH TRANSACTION GROWTH (VOLUMES AS 'm', PCT WITH '%')
 DROP TABLE IF EXISTS kpi10_branch_mom_growth;
-CREATE TABLE kpi10_branch_mom_growth (branch VARCHAR(100), txn_month VARCHAR(10), monthly_volume DECIMAL(18,4), prev_month_volume DECIMAL(18,4), mom_growth_pct DECIMAL(10,2));
+CREATE TABLE kpi10_branch_mom_growth (
+    branch VARCHAR(100), 
+    txn_month VARCHAR(10), 
+    monthly_volume_formatted VARCHAR(20), 
+    prev_month_volume_formatted VARCHAR(20), 
+    mom_growth_pct_formatted VARCHAR(10)
+);
 INSERT INTO kpi10_branch_mom_growth
 WITH MonthlyBranchVolume AS (
-    SELECT branch,
+    SELECT 
+        branch,
         DATE_FORMAT(DATE_ADD('1899-12-30', INTERVAL transaction_date DAY), '%Y-%m') AS Txn_Month,
         SUM(amount) AS Monthly_Volume
-    FROM debitcredit GROUP BY branch, Txn_Month
+    FROM debitcredit 
+    GROUP BY branch, Txn_Month
 )
-SELECT branch, Txn_Month, Monthly_Volume,
-    LAG(Monthly_Volume) OVER(PARTITION BY branch ORDER BY Txn_Month),
-    ROUND(
+SELECT 
+    branch, 
+    Txn_Month, 
+    CONCAT(ROUND(Monthly_Volume / 1000000.0, 1), 'm'),
+    CONCAT(ROUND(LAG(Monthly_Volume) OVER(PARTITION BY branch ORDER BY Txn_Month) / 1000000.0, 1), 'm'),
+    CONCAT(ROUND(
         ((Monthly_Volume - LAG(Monthly_Volume) OVER(PARTITION BY branch ORDER BY Txn_Month)) /
         NULLIF(LAG(Monthly_Volume) OVER(PARTITION BY branch ORDER BY Txn_Month), 0)) * 100, 2
-    )
+    ), '%')
 FROM MonthlyBranchVolume;
 SELECT * FROM kpi10_branch_mom_growth;
 
