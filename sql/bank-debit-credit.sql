@@ -29,20 +29,28 @@ SELECT COUNT(*) FROM debitcredit;
 
 USE bank_db;
 
--- KPI 1: TOTAL CREDIT
+-- KPI 1: TOTAL CREDIT (FORMATTED AS MILLIONS STRING)
 DROP TABLE IF EXISTS kpi1_total_credit;
-CREATE TABLE kpi1_total_credit (total_credit DECIMAL(18,4));
+-- Changed column type to VARCHAR to store the "m" suffix
+CREATE TABLE kpi1_total_credit (total_credit_formatted VARCHAR(20));
+
 INSERT INTO kpi1_total_credit
-SELECT SUM(amount) FROM debitcredit WHERE transaction_type = 'Credit';
+SELECT 
+    CONCAT(ROUND(SUM(amount) / 1000000.0, 1), 'm') 
+FROM debitcredit 
+WHERE transaction_type = 'Credit';
+
 SELECT * FROM kpi1_total_credit;
 
--- KPI 2: TOTAL DEBIT
+-- KPI 2: TOTAL DEBIT (FORMATTED AS MILLIONS STRING)
 DROP TABLE IF EXISTS kpi2_total_debit;
-CREATE TABLE kpi2_total_debit (total_debit DECIMAL(18,4));
+CREATE TABLE kpi2_total_debit (total_debit_formatted VARCHAR(20));
 INSERT INTO kpi2_total_debit
-SELECT SUM(amount) FROM debitcredit WHERE transaction_type = 'Debit';
+SELECT 
+    CONCAT(ROUND(SUM(amount) / 1000000.0, 1), 'm') 
+FROM debitcredit 
+WHERE transaction_type = 'Debit';
 SELECT * FROM kpi2_total_debit;
-
 
 -- KPI 3: CREDIT TO DEBIT RATIO
 DROP TABLE IF EXISTS kpi3_credit_debit_ratio;
@@ -54,14 +62,20 @@ SELECT ROUND(
 4) FROM debitcredit;
 SELECT * FROM kpi3_credit_debit_ratio;
 
--- KPI 4: NET TRANSACTION AMOUNT
+-- KPI 4: NET TRANSACTION AMOUNT (FORMATTED AS THOUSANDS STRING)
 DROP TABLE IF EXISTS kpi4_net_transaction_amount;
-CREATE TABLE kpi4_net_transaction_amount (net_transaction_amount DECIMAL(18,4));
+-- Using VARCHAR to allow for the 'k' suffix
+CREATE TABLE kpi4_net_transaction_amount (net_transaction_formatted VARCHAR(20));
 INSERT INTO kpi4_net_transaction_amount
-SELECT SUM(CASE WHEN transaction_type = 'Credit' THEN amount
-               WHEN transaction_type = 'Debit'  THEN -amount
-               ELSE 0 END) FROM debitcredit;
+SELECT 
+    CONCAT(ROUND(SUM(CASE 
+        WHEN transaction_type = 'Credit' THEN amount
+        WHEN transaction_type = 'Debit'  THEN -amount
+        ELSE 0 
+    END) / 1000.0, 1), 'k')
+FROM debitcredit;
 SELECT * FROM kpi4_net_transaction_amount;
+
 
 -- KPI 5: ACCOUNT ACTIVITY RATIO
 DROP TABLE IF EXISTS kpi5_account_activity_ratio;
