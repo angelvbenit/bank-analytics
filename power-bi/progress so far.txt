@@ -1,0 +1,24 @@
+1) Get data, clean
+2) Convert account ID to text
+3) Advanced editor code:
+
+let
+    StartDate = #date(2024, 1, 1),
+    EndDate = #date(2024, 12, 31),
+    DayCount = Duration.Days(EndDate - StartDate) + 1,
+    DateList = List.Dates(StartDate, DayCount, #duration(1,0,0,0)),
+    DateTable = Table.FromList(DateList, Splitter.SplitByNothing(), {"Date"}),
+    DateCol = Table.TransformColumnTypes(DateTable, {{"Date", type date}}),
+    AddYear = Table.AddColumn(DateCol, "Year", each Date.Year([Date]), Int64.Type),
+    AddMonth = Table.AddColumn(AddYear, "Month Number", each Date.Month([Date]), Int64.Type),
+    AddMonthName = Table.AddColumn(AddMonth, "Month Name", each Date.ToText([Date], "MMMM"), type text),
+    AddWeek = Table.AddColumn(AddMonthName, "Week Number", each Date.WeekOfYear([Date]), Int64.Type),
+    AddDay = Table.AddColumn(AddWeek, "Day Name", each Date.ToText([Date], "dddd"), type text),
+    AddQuarter = Table.AddColumn(AddDay, "Quarter", each "Q" & Text.From(Date.QuarterOfYear([Date])), type text)
+in
+    AddQuarter
+
+
+4) Rename both 
+5) Close and apply
+6) Measures
