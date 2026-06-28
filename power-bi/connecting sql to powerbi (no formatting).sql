@@ -143,43 +143,60 @@ SELECT * FROM branch_mom_growth;
 
 -- KPI 11: HIGH RISK TRANSACTION FLAG
 DROP TABLE IF EXISTS high_risk_transactions;
-CREATE TABLE high_risk_transactions (customer_id TEXT, account_number TEXT, readable_date DATE, amount TEXT, risk_flag VARCHAR(20), threshold_used TEXT);
+CREATE TABLE high_risk_transactions (
+    customer_id TEXT, 
+    account_number TEXT, 
+    readable_date DATE, 
+    amount DECIMAL(18,4), 
+    risk_flag VARCHAR(20), 
+    threshold_used DECIMAL(18,4)
+);
 INSERT INTO high_risk_transactions
 WITH DynamicThreshold AS (
-    SELECT amount AS high_risk_cutoff
+    SELECT CAST(amount AS DECIMAL(18,4)) AS high_risk_cutoff
     FROM (
-        SELECT amount, PERCENT_RANK() OVER (ORDER BY amount) AS pct_rank
+        SELECT amount, 
+        PERCENT_RANK() OVER (ORDER BY CAST(amount AS DECIMAL(18,4))) AS pct_rank
         FROM debitcredit
     ) RankedData
     WHERE pct_rank >= 0.95
-    ORDER BY amount ASC
+    ORDER BY CAST(amount AS DECIMAL(18,4)) ASC
     LIMIT 1
 )
-SELECT d.customer_id, d.account_number,
+SELECT 
+    d.customer_id, 
+    d.account_number,
     DATE(DATE_ADD('1899-12-30', INTERVAL d.transaction_date DAY)),
-    d.amount, 'High Risk', t.high_risk_cutoff
-FROM debitcredit d CROSS JOIN DynamicThreshold t
-WHERE d.amount > t.high_risk_cutoff;
-SELECT * FROM high_risk_transactions;
+    CAST(d.amount AS DECIMAL(18,4)),
+    'High Risk', 
+    t.high_risk_cutoff
+FROM debitcredit d 
+CROSS JOIN DynamicThreshold t
+WHERE CAST(d.amount AS DECIMAL(18,4)) > t.high_risk_cutoff;
+
+SELECT COUNT(*) FROM high_risk_transactions;
+SELECT * FROM high_risk_transactions LIMIT 5;
+
 
 -- KPI 12: SUSPICIOUS TRANSACTION COUNT
 DROP TABLE IF EXISTS suspicious_txn_count;
 CREATE TABLE suspicious_txn_count (total_suspicious_transactions INT);
 INSERT INTO suspicious_txn_count
 WITH DynamicThreshold AS (
-    SELECT amount AS high_risk_cutoff
+    SELECT CAST(amount AS DECIMAL(18,4)) AS high_risk_cutoff
     FROM (
-        SELECT amount, PERCENT_RANK() OVER (ORDER BY amount) AS pct_rank
+        SELECT amount, 
+        PERCENT_RANK() OVER (ORDER BY CAST(amount AS DECIMAL(18,4))) AS pct_rank
         FROM debitcredit
     ) RankedData
     WHERE pct_rank >= 0.95
-    ORDER BY amount ASC
+    ORDER BY CAST(amount AS DECIMAL(18,4)) ASC
     LIMIT 1
 )
-SELECT COUNT(*) FROM debitcredit d
+SELECT COUNT(*) 
+FROM debitcredit d
 CROSS JOIN DynamicThreshold t
-WHERE d.amount > t.high_risk_cutoff;
-
+WHERE CAST(d.amount AS DECIMAL(18,4)) > t.high_risk_cutoff;
 SELECT * FROM suspicious_txn_count;
 
 -- KPI 13: TOTAL TRANSACTIONS
@@ -188,3 +205,18 @@ CREATE TABLE total_transactions (total_transactions INT);
 INSERT INTO total_transactions
 SELECT COUNT(*) FROM debitcredit;
  select * from total_transactions;
+ 
+--
+DROP TABLE IF EXISTS risk_threshold;
+CREATE TABLE risk_threshold (threshold_value DECIMAL(18,4));
+INSERT INTO risk_threshold
+SELECT CAST(amount AS DECIMAL(18,4)) AS high_risk_cutoff
+FROM (
+    SELECT amount, 
+    PERCENT_RANK() OVER (ORDER BY CAST(amount AS DECIMAL(18,4))) AS pct_rank
+    FROM debitcredit
+) RankedData
+WHERE pct_rank >= 0.95
+ORDER BY CAST(amount AS DECIMAL(18,4)) ASC
+LIMIT 1;
+SELECT * FROM risk_threshold;
