@@ -1,8 +1,8 @@
-# 🏦 Bank Debit Credit Dashboard: Power BI Project
+# Bank Debit Credit Dashboard: Power BI Project
 
 > An end-to-end business intelligence solution for banking transaction analytics, built on a MySQL backend with a fully dynamic, slicer-driven Power BI frontend powered entirely by DAX.
 
-## 📸 Dashboard Preview
+## Dashboard Preview
 
 ### Overview
 ![Overview](https://raw.githubusercontent.com/angelvbenit/bank-analytics/main/power-bi/01_overview.jpg)
