@@ -189,7 +189,7 @@ All KPI values verified with no filters applied (Year = All, Purpose Category = 
 
 ## 11. Dashboard Preview
 
-![Banking Dashboard](https://github.com/angelvbenit/bank-analytics/tableau/dashboard.jpg)
+![Banking Dashboard](https://raw.githubusercontent.com/angelvbenit/bank-analytics/main/tableau/dashboard.jpg)
 
 🔗 **Live Dashboard:** [View on Tableau Public](https://public.tableau.com/app/profile/angelvbenit/viz/banking-dashboard/banking-dashboard)
 
