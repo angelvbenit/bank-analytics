@@ -1,43 +1,12 @@
 # Bank Analytics: Multi-Tool Loan & Transaction Intelligence
 
-An end-to-end analytics capstone project analyzing microfinance loan performance and bank transaction activity across **Excel, SQL, Power BI, and Tableau** showcasing the same business problem solved four different ways, from raw data to interactive dashboards.
+An end-to-end banking analytics project analyzing **loan portfolio performance** and **bank transaction activity** across **Excel, SQL, Power BI, and Tableau**.
+
+Built from two raw banking datasets, the project demonstrates how the same business problem can be solved consistently across multiple analytics platforms using SQL, DAX, LOD expressions, and Power Query to deliver interactive dashboards and business insights.
 
 ---
 
-## 1. Project Summary
-
-This project turns two raw banking datasets — a **6-sheet loan portfolio** (1,000 clients, 2,000 loans, 2015–2023) and a **10K–100K row transaction ledger** — into decision-ready dashboards. The goal: give lending and operations teams a clear read on **portfolio health, repayment risk, and transaction-level fraud signals**, and demonstrate the same KPI logic implemented consistently across Excel, MySQL, Power BI, and Tableau.
-
-Each tool was built to solve the problem in its own idiomatic way (DAX measures, SQL window functions, LOD expressions, PERCENTILE-based risk scoring), and results were cross-validated against each other for accuracy.
-
----
-
-## 2. Repository Structure
-
-```
-bank-analytics/
-│
-├── README.md  ← Executive summary, tool comparision, insights, key findings & solutions
-│
-├── advanced-excel/
-│   ├── Dashboard files
-│   └── README.md
-│
-├── sql/
-│   ├── Scripts
-│   └── README.md
-│
-├── power-bi/
-│   ├── PBIX
-│   └── README.md
-│
-└── tableau/
-    ├── Workbook
-    └── README.md
-```
-
----
-## 3. Dashboard Preview
+## Dashboard Preview
 
 ### Advanced Excel
 
@@ -53,15 +22,15 @@ bank-analytics/
 
 ### Power BI
 
-#### Overview (Page - 1)
+#### Overview
 
 ![Overview](https://raw.githubusercontent.com/angelvbenit/bank-analytics/refs/heads/main/power-bi/01_overview.jpg)
 
-#### Branch & Bank (Page - 2)
+#### Branch & Bank
 
 ![Branch Dashboard](https://raw.githubusercontent.com/angelvbenit/bank-analytics/refs/heads/main/power-bi/02_branch-bank.jpg)
 
-#### Risk Analytics (Page - 3)
+#### Risk Analytics
 
 ![Risk Dashboard](https://raw.githubusercontent.com/angelvbenit/bank-analytics/refs/heads/main/power-bi/03_risk.jpg)
 
@@ -75,79 +44,105 @@ bank-analytics/
 
 ---
 
-## 4. KPI List
+## Project Summary
 
-| KPI | Business Purpose |
-|---|---|
-| **Total / Active / New Clients** | Client base size and portfolio engagement |
-| **Client Retention Rate** | Year-over-year client growth |
-| **Total Loan / Funded Amount** | Portfolio scale and disbursement accuracy |
-| **Loan Growth %** | Business expansion or contraction signal |
-| **Principal Recovery Rate** | Collection efficiency |
-| **Interest Income** | Core lending revenue |
-| **Default Rate / Delinquency Rate** | Credit risk — loss events and early warnings |
-| **On-Time Repayment %** | Borrower repayment quality |
-| **Branch & Product Performance** | Where volume and profitability concentrate |
-| **Credit-to-Debit Ratio / Net Transaction Amount** | Liquidity and cash-flow health |
-| **High-Risk Transaction Flag (95th percentile)** | Statistically-driven fraud/anomaly detection |
+This project transforms two banking datasets into interactive dashboards that help monitor:
 
-23 measures in Excel/Power BI, 17 KPIs in Tableau, and 17 + 13 KPIs across the two SQL projects — all reconciled to the same underlying numbers.
+- Portfolio growth and loan performance
+- Repayment behavior and credit risk
+- Branch and product performance
+- Debit and credit transaction trends
+- High-risk transaction detection using percentile-based anomaly scoring
+
+The same business problem was independently implemented in **Excel, MySQL, Power BI, and Tableau**, with KPIs validated across platforms to ensure consistent business results.
 
 ---
 
-## 5. Excel Dashboard
+## Repository Structure
 
-Built on **Power Query + Power Pivot + DAX**, using a star-schema data model (5 relationships, dedicated Calendar table) with 23 live measures.
-
-- **Loan Dashboard:** ₹52.36M disbursed, ₹53.86M collected, 99.05% principal recovery, 5.00% default rate, 71.05% on-time repayment. Top branches: Dhuri, Muktsar, Behror.
-- **Debit/Credit Dashboard:** 10,000 transactions, ₹127.6M credited vs ₹127.3M debited (1.00x ratio), with a self-adjusting **95th-percentile risk threshold** flagging the top 5% (5,000) of transactions as high-risk , no hardcoded dollar cutoffs.
-
----
-
-## 6. Tableau Dashboard
-
-Rebuilds the Excel KPI model using **LOD expressions and a left-joined data model**, with `Dim Client` deliberately kept as a standalone source to correctly preserve the full 1,000-client base (a join-vs-relationship modeling nuance not present in Excel/Power BI).
-
-All 17 KPIs were validated line-by-line against the SQL output — **100% match** across every metric, from Total Clients (1,000) down to Interest Income (₹5.06M).
+```text
+bank-analytics/
+│
+├── README.md
+├── advanced-excel/
+├── sql/
+├── power-bi/
+└── tableau/
+```
 
 ---
 
-## 7. Power BI Dashboard
+## Key KPIs
 
-Connects live to a **MySQL backend via ODBC**, with every KPI rebuilt as a DAX measure (not a static SQL aggregate) so the dashboard responds instantly to slicers , branch, bank, date, and transaction type all filter every visual in real time.
-
-Handles Excel-serial date conversion, text-to-numeric casting, and a dynamic `PERCENTILE.INC`-based risk score across the full **100,000-transaction** dataset, surfaced in a dedicated high-risk transactions table for compliance review.
-
----
-
-## 8. SQL Query Image
-
-**Two MySQL 8.0 databases** power the loan and transaction analytics:
-
-- **Loan schema** — star schema (`fact_loan`, `fact_repayment`, `dim_client`, `dim_branch`, `dim_product`), 17 KPIs using `CASE WHEN`, `JOIN`, `NULLIF`, and dynamic year comparisons.
-- **Transaction schema** — single fact table (`debitcredit`), 13 KPIs using `PERCENT_RANK()` for fraud detection, `LAG()` for month-over-month growth, and CTEs for readability.
-
-Common engineering fixes applied: Windows `\r\n` carriage-return stripping, Excel serial-date conversion, and foreign-key–safe reload procedures , all documented with root cause and rule violated in each tool's individual README.
+| Area | KPIs |
+|------|------|
+| Client Portfolio | Total Clients, Active Clients, New Clients, Retention Rate |
+| Loan Performance | Total Loan Amount, Principal Recovery Rate, Interest Income, Default Rate |
+| Business Growth | Loan Growth %, Branch Performance, Product Performance |
+| Transaction Analytics | Total Credit, Total Debit, Net Transaction Amount, Credit-to-Debit Ratio |
+| Risk Analytics | Delinquency Rate, On-Time Repayment %, High-Risk Transactions |
 
 ---
 
-## 9. Key Takeaways
+## Tool Highlights
 
-**Business Insights**
-- The loan book is healthy overall (99% principal recovery, 5% default) but **on-time repayment at 71%** signals room to tighten collections before loans slip into delinquency.
-- Transaction-level risk scoring shows a **stable, evenly-distributed 6-branch network** — no single branch is a fraud or volume outlier, which is itself a useful baseline finding.
-- Statistically-driven thresholds (95th percentile) consistently outperform hardcoded fraud rules — they self-adjust as data volume and typical transaction size grow.
+### Advanced Excel
 
-**Challenges**
-- **Cross-tool consistency:** Tableau's join model and Excel/Power BI's relationship model handle unmatched dimension rows differently (870 vs 1,000 clients) — required a standalone-source workaround in Tableau to match.
-- **Data quality gaps:** hidden Windows line-ending characters, Excel serial dates, and a partial-month data artifact (Dec 2024) all silently broke KPIs until explicitly diagnosed and fixed.
-- **Filter-context traps:** Power BI KPIs built on static SQL aggregates ignored slicers entirely until rewritten as DAX `CALCULATE()` measures — a reminder that BI-layer logic and DB-layer logic aren't interchangeable.
+- Power Query + Power Pivot data model
+- Star schema with Calendar table
+- 23 DAX measures
+- Interactive loan and transaction dashboards
 
-**Future Recommendations**
-- Automate the `\r` and date-cleaning fixes upstream (in the ETL/load step) rather than post-load, to remove a recurring failure point.
-- Extend the 95th-percentile risk model with a second-tier (e.g. 99th percentile "critical risk") band for tiered compliance review.
-- Add a client-level cohort/vintage analysis to see how retention and default rates evolve by loan origination year, not just year-over-year totals.
+### MySQL
+
+- Star-schema loan database
+- Window functions, CTEs, CASE statements, and joins
+- Dynamic fraud detection using `PERCENT_RANK()`
+- Data cleaning and ETL preprocessing
+
+### Power BI
+
+- Live MySQL connection
+- Dynamic DAX measures
+- Interactive filtering and drill-down analysis
+- Percentile-based transaction risk analytics
+
+### Tableau
+
+- Rebuilt KPI model using LOD expressions
+- Relationship-aware data modeling
+- KPI validation against SQL outputs
 
 ---
 
-*Full build logic, error logs, and step-by-step methodology for each tool are documented in their respective folder READMEs.*
+## Key Insights
+
+- Achieved **99.05% principal recovery** with a **5.00% default rate**, indicating a healthy loan portfolio.
+- **71.05% on-time repayment** highlights opportunities to improve collection efficiency.
+- Dynamic percentile-based risk scoring adapts automatically as transaction volume and values change.
+- Cross-platform implementation ensured KPI consistency across Excel, SQL, Power BI, and Tableau.
+
+---
+
+## Technical Highlights
+
+- Star-schema dimensional modeling
+- SQL window functions and Common Table Expressions (CTEs)
+- DAX measures and filter context
+- Tableau LOD expressions
+- Power Query data transformation
+- Dynamic percentile-based anomaly detection
+- Cross-platform KPI validation
+
+---
+
+## Project Goals
+
+- Build production-style banking analytics dashboards.
+- Apply consistent business logic across multiple analytics platforms.
+- Demonstrate SQL, dashboarding, data modeling, and business intelligence skills.
+- Showcase an end-to-end analytics workflow from raw data to executive reporting.
+
+---
+
+Detailed implementation, SQL scripts, dashboard logic, data-cleaning steps, and methodology are documented inside each tool's individual README.
