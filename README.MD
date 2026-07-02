@@ -42,6 +42,9 @@ Built from two raw banking datasets, the project demonstrates how the same busin
 
 ![Tableau Dashboard](https://raw.githubusercontent.com/angelvbenit/bank-analytics/refs/heads/main/tableau/dashboard.jpg)
 
+##  Interactive Dashboard
+
+🔗 **Tableau Public:** https://public.tableau.com/app/profile/angelvbenit/viz/banking-dashboard/banking-dashboard
 ---
 
 ## Project Summary
