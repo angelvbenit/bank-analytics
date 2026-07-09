@@ -112,57 +112,47 @@ SELECT * FROM dim_branch LIMIT 3;
 
 DELETE FROM dim_branch WHERE Branch_ID IS NULL;
 
--- 1. Total Clients
-DROP TABLE IF EXISTS kpi_01_total_clients;
-CREATE TABLE kpi_01_total_clients AS SELECT COUNT(*) AS Total_Clients FROM dim_client;
-SELECT * FROM kpi_01_total_clients;
-
--- 2. Active Clients
-DROP TABLE IF EXISTS kpi_02_active_clients;
-CREATE TABLE kpi_02_active_clients AS SELECT COUNT(DISTINCT Client_id) AS Active_Clients FROM fact_loan WHERE Loan_Status = 'Active';
-SELECT * FROM kpi_02_active_clients;
-
+USE bank_db;
 
 USE bank_db;
 
-## 1. Disable safe mode to allow updates
-SET SQL_SAFE_UPDATES = 0;
+-- =========================================================
+-- KPI TABLES
+-- =========================================================
 
-## 2. Extract the date from the timestamp string and update the column
-UPDATE fact_loan
-SET Disbursement_Date = STR_TO_DATE(LEFT(Disbursement_Date, 10), '%Y-%m-%d')
-WHERE Disbursement_Date IS NOT NULL;
+-- 1. Total Clients
+DROP TABLE IF EXISTS kpi01_clients;
+CREATE TABLE kpi01_clients AS
+SELECT COUNT(*) AS Total_Clients
+FROM dim_client;
+SELECT * FROM kpi01_clients;
 
-## 3. Re-enable safe mode
-SET SQL_SAFE_UPDATES = 1;
+-- 2. Active Clients
+DROP TABLE IF EXISTS kpi02_active;
+CREATE TABLE kpi02_active AS
+SELECT COUNT(DISTINCT Client_id) AS Active_Clients
+FROM fact_loan
+WHERE Loan_Status = 'Active';
+SELECT * FROM kpi02_active;
 
-## 4. Check if the dates are now readable (should show real dates, not NULL)
-SELECT Disbursement_Date, COUNT(*) 
-FROM fact_loan 
-GROUP BY Disbursement_Date 
-LIMIT 10;
-
-
--- 3. New Clients (2022)
-DROP TABLE IF EXISTS kpi_03_new_clients;
-CREATE TABLE kpi_03_new_clients AS
+-- 3. New Clients (All-Time)
+DROP TABLE IF EXISTS kpi03_new;
+CREATE TABLE kpi03_new AS
 SELECT COUNT(Client_id) AS New_Clients
 FROM (
     SELECT Client_id
     FROM fact_loan
     GROUP BY Client_id
 ) AS All_Time_New_Clients;
-SELECT * FROM kpi_03_new_clients;
+SELECT * FROM kpi03_new;
 
-USE bank_db;
-
--- 4. Client Retention Rate 
-DROP TABLE IF EXISTS kpi_04_client_retention_rate;
-CREATE TABLE kpi_04_client_retention_rate AS
+-- 4. Client Retention Rate (%)
+DROP TABLE IF EXISTS kpi04_retention;
+CREATE TABLE kpi04_retention AS
 SELECT
     curr.curr_clients,
     prev.prev_clients,
-    ROUND((curr.curr_clients / NULLIF(prev.prev_clients, 0)) * 100, 2) AS Client_Retention_Rate_Pct
+    CONCAT(ROUND((curr.curr_clients / NULLIF(prev.prev_clients, 0)) * 100, 2), '%') AS Client_Retention_Rate
 FROM
     (SELECT COUNT(DISTINCT Client_id) AS curr_clients
      FROM fact_loan
@@ -170,31 +160,36 @@ FROM
     (SELECT COUNT(DISTINCT Client_id) AS prev_clients
      FROM fact_loan
      WHERE YEAR(Disbursement_Date) = (SELECT MAX(YEAR(Disbursement_Date)) FROM fact_loan) - 1) AS prev;
+SELECT * FROM kpi04_retention;
 
-SELECT * FROM kpi_04_client_retention_rate;
-
--- 5. Total Loan Amount Disbursed
-DROP TABLE IF EXISTS kpi_05_total_loan_amount;
-CREATE TABLE kpi_05_total_loan_amount AS SELECT SUM(Loan_Amount) AS Total_Loan_Amount FROM fact_loan;
-SELECT * FROM kpi_05_total_loan_amount;
-
--- 6. Total Funded Amount
-DROP TABLE IF EXISTS kpi_06_total_funded_amount;
-CREATE TABLE kpi_06_total_funded_amount AS SELECT SUM(Funded_Amount) AS Total_Funded_Amount FROM fact_loan;
-SELECT * FROM kpi_06_total_funded_amount;
-
--- 7. Average Loan Size
-DROP TABLE IF EXISTS kpi_07_average_loan_size;
-CREATE TABLE kpi_07_average_loan_size AS SELECT AVG(Loan_Amount) AS Avg_Loan_Size FROM fact_loan;
-SELECT * FROM kpi_07_average_loan_size;
-
--- 8. Loan Growth %
-DROP TABLE IF EXISTS kpi_08_loan_growth;
-CREATE TABLE kpi_08_loan_growth AS
+-- 5. Total Loan Amount Disbursed (Millions)
+DROP TABLE IF EXISTS kpi05_loan_amt;
+CREATE TABLE kpi05_loan_amt AS
+SELECT CONCAT(ROUND(SUM(Loan_Amount) / 1000000, 2), 'M') AS Total_Loan_Amount
+FROM fact_loan;
+SELECT * FROM kpi05_loan_amt;
+ 
+-- 6. Total Funded Amount (Millions)
+DROP TABLE IF EXISTS kpi06_funded_amt;
+CREATE TABLE kpi06_funded_amt AS
+SELECT CONCAT(ROUND(SUM(Funded_Amount) / 1000000, 2), 'M') AS Total_Funded_Amount
+FROM fact_loan;
+SELECT * FROM kpi06_funded_amt;
+ 
+-- 7. Average Loan Size (Thousands)
+DROP TABLE IF EXISTS kpi07_avg_loan;
+CREATE TABLE kpi07_avg_loan AS
+SELECT CONCAT(ROUND(AVG(Loan_Amount) / 1000, 2), 'K') AS Avg_Loan_Size
+FROM fact_loan;
+SELECT * FROM kpi07_avg_loan;
+ 
+-- 8. Loan Growth % (curr/prev in Millions, growth as %)
+DROP TABLE IF EXISTS kpi08_growth;
+CREATE TABLE kpi08_growth AS
 SELECT
-    curr.curr_amt,
-    prev.prev_amt,
-    ROUND(((curr.curr_amt - prev.prev_amt) / NULLIF(prev.prev_amt, 0)) * 100, 2) AS Loan_Growth_Pct
+    CONCAT(ROUND(curr.curr_amt / 1000000, 2), 'M') AS Curr_Amount,
+    CONCAT(ROUND(prev.prev_amt / 1000000, 2), 'M') AS Prev_Amount,
+    CONCAT(ROUND(((curr.curr_amt - prev.prev_amt) / NULLIF(prev.prev_amt, 0)) * 100, 2), '%') AS Loan_Growth
 FROM
     (SELECT SUM(Loan_Amount) AS curr_amt
      FROM fact_loan
@@ -202,91 +197,82 @@ FROM
     (SELECT SUM(Loan_Amount) AS prev_amt
      FROM fact_loan
      WHERE YEAR(Disbursement_Date) = (SELECT MAX(YEAR(Disbursement_Date)) FROM fact_loan) - 1) AS prev;
-
-SELECT * FROM kpi_08_loan_growth;
-
-
--- 9. Total Repayments Collected
-DROP TABLE IF EXISTS kpi_09_total_repayments;
-CREATE TABLE kpi_09_total_repayments AS SELECT SUM(Total_Pymnt) AS Total_Repayments FROM fact_repayment;
-SELECT * FROM kpi_09_total_repayments;
-
--- 10. Principal Recovery Rate
-DROP TABLE IF EXISTS kpi_10_principal_recovery;
-CREATE TABLE kpi_10_principal_recovery AS
-SELECT (SUM(r.Total_Rec_Prncp) / NULLIF(SUM(l.Loan_Amount), 0)) * 100 AS Principal_Recovery_Rate_Pct
-FROM fact_repayment r JOIN fact_loan l ON r.Account_ID = l.Account_ID;
-SELECT * FROM kpi_10_principal_recovery;
-
--- 11. Interest Income
-DROP TABLE IF EXISTS kpi_11_interest_income;
-CREATE TABLE kpi_11_interest_income AS SELECT SUM(Total_Rrec_int) AS Interest_Income FROM fact_repayment;
-SELECT * FROM kpi_11_interest_income;
-
-
-####
-SET SQL_SAFE_UPDATES = 0;
-UPDATE fact_repayment SET Is_Delinquent_Loan = TRIM(BOTH '\r' FROM Is_Delinquent_Loan);
-UPDATE fact_repayment SET Is_Default_Loan = TRIM(BOTH '\r' FROM Is_Default_Loan);
-SET SQL_SAFE_UPDATES = 1;
-####
-
-
--- 12. Default Rate
-DROP TABLE IF EXISTS kpi_12_default_rate;
-CREATE TABLE kpi_12_default_rate AS SELECT (SUM(CASE WHEN Is_Default_Loan = 'Y' THEN 1 ELSE 0 END) / COUNT(*)) * 100 AS Default_Rate_Pct FROM fact_repayment;
-SELECT * FROM kpi_12_default_rate;
-
--- 13. Delinquency Rate
-DROP TABLE IF EXISTS kpi_13_delinquency_rate;
-CREATE TABLE kpi_13_delinquency_rate AS SELECT (SUM(CASE WHEN Is_Delinquent_Loan = 'Y' THEN 1 ELSE 0 END) / COUNT(*)) * 100 AS Delinquency_Rate_Pct FROM fact_repayment;
-SELECT * FROM kpi_13_delinquency_rate;
-
--- 14. On-Time Repayment %
-#####
-SET SQL_SAFE_UPDATES = 0;
-UPDATE fact_repayment 
-SET Repayment_Behavior = TRIM(BOTH '\r' FROM Repayment_Behavior);
-SET SQL_SAFE_UPDATES = 1;
-SELECT COUNT(*) FROM fact_repayment WHERE Repayment_Behavior = 'On-Time';
-######
-DROP TABLE IF EXISTS kpi_14_ontime_repayment;
-CREATE TABLE kpi_14_ontime_repayment AS
+SELECT * FROM kpi08_growth;
+ 
+-- 9. Total Repayments Collected (Millions)
+DROP TABLE IF EXISTS kpi09_repay;
+CREATE TABLE kpi09_repay AS
+SELECT CONCAT(ROUND(SUM(Total_Pymnt) / 1000000, 2), 'M') AS Total_Repayments
+FROM fact_repayment;
+SELECT * FROM kpi09_repay;
+ 
+-- 10. Principal Recovery Rate (%)
+DROP TABLE IF EXISTS kpi10_recovery;
+CREATE TABLE kpi10_recovery AS
+SELECT CONCAT(ROUND((SUM(r.Total_Rec_Prncp) / NULLIF(SUM(l.Loan_Amount), 0)) * 100, 2), '%') AS Principal_Recovery_Rate
+FROM fact_repayment r
+JOIN fact_loan l ON r.Account_ID = l.Account_ID;
+SELECT * FROM kpi10_recovery;
+ 
+-- 11. Interest Income (Millions)
+DROP TABLE IF EXISTS kpi11_interest;
+CREATE TABLE kpi11_interest AS
+SELECT CONCAT(ROUND(SUM(Total_Rrec_int) / 1000000, 2), 'M') AS Interest_Income
+FROM fact_repayment;
+SELECT * FROM kpi11_interest;
+ 
+-- 12. Default Rate (%)
+DROP TABLE IF EXISTS kpi12_default;
+CREATE TABLE kpi12_default AS
+SELECT CONCAT(ROUND((SUM(CASE WHEN Is_Default_Loan = 'Y' THEN 1 ELSE 0 END) / COUNT(*)) * 100, 2), '%') AS Default_Rate
+FROM fact_repayment;
+SELECT * FROM kpi12_default;
+ 
+-- 13. Delinquency Rate (%)
+DROP TABLE IF EXISTS kpi13_delinq;
+CREATE TABLE kpi13_delinq AS
+SELECT CONCAT(ROUND((SUM(CASE WHEN Is_Delinquent_Loan = 'Y' THEN 1 ELSE 0 END) / COUNT(*)) * 100, 2), '%') AS Delinquency_Rate
+FROM fact_repayment;
+SELECT * FROM kpi13_delinq;
+ 
+-- 14. On-Time Repayment % 
+DROP TABLE IF EXISTS kpi14_ontime;
+CREATE TABLE kpi14_ontime AS
 SELECT
     SUM(CASE WHEN Repayment_Behavior = 'On-Time' THEN 1 ELSE 0 END) AS OnTime_Count,
     COUNT(*) AS Total_Repayments,
-    ROUND(SUM(CASE WHEN Repayment_Behavior = 'On-Time' THEN 1 ELSE 0 END) / COUNT(*) * 100, 2) AS On_Time_Repayment_Pct
+    CONCAT(ROUND(SUM(CASE WHEN Repayment_Behavior = 'On-Time' THEN 1 ELSE 0 END) / COUNT(*) * 100, 2), '%') AS On_Time_Repayment
 FROM fact_repayment;
-
-SELECT * FROM kpi_14_ontime_repayment;
-
--- 15. Loan by Branch
-DROP TABLE IF EXISTS kpi_15_loan_by_branch;
-CREATE TABLE kpi_15_loan_by_branch AS
+SELECT * FROM kpi14_ontime;
+ 
+-- 15. Loan by Branch (Millions)
+DROP TABLE IF EXISTS kpi15_branch;
+CREATE TABLE kpi15_branch AS
 SELECT
     b.Branch_Name,
     b.Branch_Performance_Category,
-    SUM(l.Loan_Amount) AS Total_Loan_Amount
+    CONCAT(ROUND(SUM(l.Loan_Amount) / 1000000, 2), 'M') AS Total_Loan_Amount
 FROM fact_loan l
 JOIN dim_branch b ON l.Branch_ID = b.Branch_ID
 GROUP BY b.Branch_Name, b.Branch_Performance_Category
-ORDER BY Total_Loan_Amount DESC;
-
-SELECT * FROM kpi_15_loan_by_branch;
-
-
--- 16. Product Loan Volume
-DROP TABLE IF EXISTS kpi_16_product_loan_volume;
-CREATE TABLE kpi_16_product_loan_volume AS
-SELECT p.Purpose_Category, SUM(l.Loan_Amount) AS Product_Loan_Volume 
-FROM fact_loan l JOIN dim_product p ON l.Product_Id = p.Product_Id GROUP BY p.Purpose_Category;
-SELECT * FROM kpi_16_product_loan_volume;
-
--- 17. Product Profitability
-DROP TABLE IF EXISTS kpi_17_product_profitability;
-CREATE TABLE kpi_17_product_profitability AS
-SELECT p.Purpose_Category, SUM(r.Total_Rrec_int) AS Product_Profitability 
-FROM fact_loan l JOIN fact_repayment r ON l.Account_ID = r.Account_ID JOIN dim_product p ON l.Product_Id = p.Product_Id GROUP BY p.Purpose_Category;
-SELECT * FROM kpi_17_product_profitability;
-
-
+ORDER BY SUM(l.Loan_Amount) DESC;
+SELECT * FROM kpi15_branch;
+ 
+-- 16. Product Loan Volume (Millions)
+DROP TABLE IF EXISTS kpi16_prod_vol;
+CREATE TABLE kpi16_prod_vol AS
+SELECT p.Purpose_Category, CONCAT(ROUND(SUM(l.Loan_Amount) / 1000000, 2), 'M') AS Product_Loan_Volume
+FROM fact_loan l
+JOIN dim_product p ON l.Product_Id = p.Product_Id
+GROUP BY p.Purpose_Category;
+SELECT * FROM kpi16_prod_vol;
+ 
+-- 17. Product Profitability (Millions)
+DROP TABLE IF EXISTS kpi17_prod_profit;
+CREATE TABLE kpi17_prod_profit AS
+SELECT p.Purpose_Category, CONCAT(ROUND(SUM(r.Total_Rrec_int) / 1000000, 2), 'M') AS Product_Profitability
+FROM fact_loan l
+JOIN fact_repayment r ON l.Account_ID = r.Account_ID
+JOIN dim_product p ON l.Product_Id = p.Product_Id
+GROUP BY p.Purpose_Category;
+SELECT * FROM kpi17_prod_profit;
